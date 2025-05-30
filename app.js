@@ -5,10 +5,7 @@ require('dotenv').config();
 const { v4: uuidv4 } = require('uuid'); // v4 é a versão mais usada
 
 const app = express()
-app.use(cors({
-    origin: 'http://localhost:4200', // frontend do Ionic
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
-  }));
+app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
@@ -19,12 +16,12 @@ pool.connect()
     .catch((err) => console.error('Erro ao conectar ao PostgreSQL:', err));
 
 
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:4200');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    next();
-  });
+// app.use((req, res, next) => {
+//     res.header('Access-Control-Allow-Origin', 'http://localhost:4200');
+//     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+//     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+//     next();
+//   });
 const port = 3000
 
 app.get('/pacientes', async (req, res) => {
