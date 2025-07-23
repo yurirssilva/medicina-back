@@ -3,6 +3,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 require('dotenv').config();
 const { v4: uuidv4 } = require('uuid'); // v4 é a versão mais usada
+const wppconnect = require('@wppconnect-team/wppconnect');
 
 const app = express()
 app.use(cors())
@@ -12,12 +13,63 @@ app.use(cors())
 //   }));
 app.use(express.json());
 
+
+wppconnect
+  .create({
+    phoneNumber: '5577991008357',
+    catchLinkCode: (str) => console.log('Code: ' + str),
+  })
+  .then((client) => start(client))
+  .catch((error) => console.log(error));
+
+// wppconnect
+//   .create({
+//     session: 'whatsapp-session',
+//     catchQR: (qrCode, asciiQR, attempt, urlCode) => {
+//       console.log("Escaneie o QR Code no seu WhatsApp:");
+//       console.log(asciiQR);
+//     },
+//   })
+//   .then((cl) => {
+//     client = cl;
+
+//     // Endpoint para enviar mensagem
+//     app.post("/send", async (req, res) => {
+//       const { phone, message } = req.body;
+
+//       if (!phone || !message) {
+//         return res.status(400).json({ error: "phone and message are required" });
+//       }
+
+//       try {
+//         const result = await client.sendText(`${phone}@c.us`, message);
+//         return res.json({ status: "success", result });
+//       } catch (error) {
+//         return res.status(500).json({ status: "error", error: error.message });
+//       }
+//     });
+
+//     // Rota simples
+//     app.get("/", (req, res) => {
+//       res.send("WhatsApp API is running!");
+//     });
+
+//     // Inicia servidor
+//     const PORT = process.env.PORT || 3000;
+//     app.listen(PORT, () => {
+//       console.log(`Servidor rodando em http://localhost:${PORT}`);
+//     });
+//   })
+//   .catch((err) => {
+//     console.error("Erro ao iniciar o cliente WPPConnect:", err);
+//   });
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL,
 });
 pool.connect()
-    .then(() => console.log('PostgreSQL conectado!'))
-    .catch((err) => console.error('Erro ao conectar ao PostgreSQL:', err));
+  .then(() => console.log('PostgreSQL conectado!'))
+  .catch((err) => console.error('Erro ao conectar ao PostgreSQL:', err));
 
 
 // app.use((req, res, next) => {
@@ -30,46 +82,68 @@ pool.connect()
 const port = 3000
 
 app.get('/pacientes', async (req, res) => {
-    try {
-        const pacientes = await pool.query('SELECT * FROM PACIENTES')
-        res.json(pacientes.rows);
-    }catch (error) {
-        console.error('Erro ao buscar no banco:', error);
-        res.status(500).json({ erro: 'Erro ao inserir usuário' });
-    }
+  try {
+    const pacientes = await pool.query('SELECT * FROM PACIENTES')
+    res.json(pacientes.rows);
+  } catch (error) {
+    console.error('Erro ao buscar no banco:', error);
+    res.status(500).json({ erro: 'Erro ao inserir usuário' });
+  }
 })
 
 
 app.get('/hora', async (req, res) => {
-    const result = await pool.query('SELECT NOW()');
-    res.send(`Hora atual do banco: ${result.rows[0].now}`);
-  });
+  const result = await pool.query('SELECT NOW()');
+  res.send(`Hora atual do banco: ${result.rows[0].now}`);
+});
 
 app.post('/cadastro', async (req, res) => {
-    const novoUsuario = {
-        uuid: uuidv4(), // Gera um UUID único
-        nome: req.body.nome,
-        cpf: req.body.cpf,
-        nsus: req.body.nSUS,
-        nascimento: req.body.nascimento,
-        preventivo: req.body.preventivo,
-        risco: req.body.risco,
-    };
-    console.log(req.body)
-    try {
-        await pool.query(
-          'INSERT INTO pacientes (uuid, nome, cpf, nsus, nascimento, preventivo, risco) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [novoUsuario.uuid, novoUsuario.nome, novoUsuario.cpf, novoUsuario.nsus, novoUsuario.nascimento, novoUsuario.preventivo, novoUsuario.risco]
-        );
-    
-        res.status(201).json({ id: novoUsuario.uuid, nome: novoUsuario.nome });
-      } catch (error) {
-        console.error('Erro ao inserir no banco:', error);
-        res.status(500).json({ erro: 'Erro ao inserir usuário' });
-      }
-    // res.send(req.body)
+  const novoUsuario = {
+    uuid: uuidv4(), // Gera um UUID único
+    nome: req.body.nome,
+    cpf: req.body.cpf,
+    nsus: req.body.nSUS,
+    nascimento: req.body.nascimento,
+    preventivo: req.body.preventivo,
+    telefone: req.body.telefone,
+    risco: req.body.risco,
+  };
+  console.log(req.body)
+  try {
+    await pool.query(
+      'INSERT INTO pacientes (uuid, nome, cpf, nsus, nascimento, preventivo, telefone, risco) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [novoUsuario.uuid, novoUsuario.nome, novoUsuario.cpf, novoUsuario.nsus, novoUsuario.nascimento, novoUsuario.preventivo, novoUsuario.telefone, novoUsuario.risco]
+    );
+
+    res.status(201).json({ id: novoUsuario.uuid, nome: novoUsuario.nome });
+  } catch (error) {
+    console.error('Erro ao inserir no banco:', error);
+    res.status(500).json({ erro: 'Erro ao inserir usuário' });
+  }
+  // res.send(req.body)
+})
+
+app.post('/send/:id', async (req, res) => {
+  const { id } = req.params;
+  const resultado = await pool.query('SELECT id, nome FROM usuarios WHERE id = $1', [id]);
+  if (resultado.rowCount === 0) {
+    return res.status(404).json({ erro: 'Usuário não encontrado' });
+  }
+
+  const dataPreventivo = new Date(resultado[0].preventivo); // Ex: 2025-07-23
+  const dataPreventivoAnual = dataPreventivo.setFullYear(dataPreventivo.getFullYear() + 1);
+  const dataPreventivosSemestral = dataPreventivo.setMonth(dataPreventivo.getMonth() + 6);
+
+  const message = `Seu último preventivo foi realizado no dia ${resultado[0].preventivo}, seu retorno está previsto para ${resultado[0].risco ? dataPreventivosSemestral.toISOString().split('T')[0] : dataPreventivoAnual.toISOString().split('T')[0]}`
+  try {
+    const result = await client.sendText(`${resultado[0].telefone}@c.us`, message);
+    return res.json({ status: "success", result });
+  } catch (error) {
+    return res.status(500).json({ status: "error", error: error.message });
+  }
+
 })
 
 app.listen(port, () => {
-    console.log(`Example app listening on port ${port}`)
+  console.log(`Example app listening on port ${port}`)
 })
