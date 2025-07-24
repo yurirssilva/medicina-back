@@ -36,6 +36,7 @@ wppconnect
         return res.status(404).json({ erro: 'Usuário não encontrado' });
       }
       const paciente = resultado.rows[0]
+      console.log(paciente)
 
       const dataPreventivo = new Date(paciente.preventivo); // Ex: 2025-07-23
       const dataPreventivoAnual = new Date(dataPreventivo);
@@ -45,6 +46,7 @@ wppconnect
 
       const message = `Olá ${paciente.nome}. Seu último preventivo foi realizado no dia ${ formatarData(dataPreventivo)} e o resultado foi ${paciente.risco ? 'alterado': 'normal'}, seu retorno está previsto para ${paciente.risco ? formatarData(dataPreventivosSemestral) : formatarData(dataPreventivoAnual)}`
       try {
+        console.log('sendText')
         const result = await client.sendText(`55${paciente.telefone}@c.us`, message);
         return res.json({ status: "success", result });
       } catch (error) {
