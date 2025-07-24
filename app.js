@@ -14,13 +14,45 @@ app.use(cors())
 app.use(express.json());
 
 
+function formatarData(date) {
+  const dia = String(date.getDate()).padStart(2, '0');
+  const mes = String(date.getMonth() + 1).padStart(2, '0'); // mês começa em 0
+  const ano = date.getFullYear();
+  return `${dia}/${mes}/${ano}`;
+}
+
 wppconnect
   .create({
     phoneNumber: '5577991008357',
     catchLinkCode: (str) => console.log('Code: ' + str),
+    browserArgs: ['--no-sandbox']
   })
-  .then((client) => start(client))
-  .catch((error) => console.log(error));
+  .then((cl) => {
+    client = cl;
+    app.post('/send/:id', async (req, res) => {
+      const { id } = req.params;
+      const resultado = await pool.query('SELECT * FROM pacientes WHERE uuid = $1', [id]);
+      if (resultado.rowCount === 0) {
+        return res.status(404).json({ erro: 'Usuário não encontrado' });
+      }
+      const paciente = resultado.rows[0]
+
+      const dataPreventivo = new Date(paciente.preventivo); // Ex: 2025-07-23
+      const dataPreventivoAnual = new Date(dataPreventivo);
+      dataPreventivoAnual.setFullYear(dataPreventivoAnual.getFullYear() + 1);
+      const dataPreventivosSemestral = new Date(dataPreventivo);
+      dataPreventivosSemestral.setMonth(dataPreventivosSemestral.getMonth() + 6);
+
+      const message = `Olá ${paciente.nome}. Seu último preventivo foi realizado no dia ${ formatarData(dataPreventivo)} e o resultado foi ${paciente.risco ? 'alterado': 'normal'}, seu retorno está previsto para ${paciente.risco ? formatarData(dataPreventivosSemestral) : formatarData(dataPreventivoAnual)}`
+      try {
+        const result = await client.sendText(`55${paciente.telefone}@c.us`, message);
+        return res.json({ status: "success", result });
+      } catch (error) {
+        return res.status(500).json({ status: "error", error: error.message });
+      }
+
+    })
+  }).catch((error) => console.log(error));
 
 // wppconnect
 //   .create({
@@ -123,26 +155,7 @@ app.post('/cadastro', async (req, res) => {
   // res.send(req.body)
 })
 
-app.post('/send/:id', async (req, res) => {
-  const { id } = req.params;
-  const resultado = await pool.query('SELECT id, nome FROM usuarios WHERE id = $1', [id]);
-  if (resultado.rowCount === 0) {
-    return res.status(404).json({ erro: 'Usuário não encontrado' });
-  }
 
-  const dataPreventivo = new Date(resultado[0].preventivo); // Ex: 2025-07-23
-  const dataPreventivoAnual = dataPreventivo.setFullYear(dataPreventivo.getFullYear() + 1);
-  const dataPreventivosSemestral = dataPreventivo.setMonth(dataPreventivo.getMonth() + 6);
-
-  const message = `Seu último preventivo foi realizado no dia ${resultado[0].preventivo}, seu retorno está previsto para ${resultado[0].risco ? dataPreventivosSemestral.toISOString().split('T')[0] : dataPreventivoAnual.toISOString().split('T')[0]}`
-  try {
-    const result = await client.sendText(`${resultado[0].telefone}@c.us`, message);
-    return res.json({ status: "success", result });
-  } catch (error) {
-    return res.status(500).json({ status: "error", error: error.message });
-  }
-
-})
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
