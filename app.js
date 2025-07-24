@@ -23,7 +23,7 @@ function formatarData(date) {
 
 wppconnect
   .create({
-    phoneNumber: '5577991008357',
+    phoneNumber: '5577991829075',
     catchLinkCode: (str) => console.log('Code: ' + str),
     browserArgs: ['--no-sandbox']
   })
